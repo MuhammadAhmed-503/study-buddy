@@ -1,56 +1,191 @@
-import { useState } from "react";
-import { Send, Bot, User, BookOpen } from "lucide-react";
+import { useState, useEffect, useRef, useCallback } from "react";
+import { Send, Bot, User, BookOpen, Trash2, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { useToast } from "@/hooks/use-toast";
+import { AIService } from "@/services/AIService";
+import { ChatService, ChatMessage } from "@/services/ChatService";
+import { NotesService, Note } from "@/services/NotesService";
 
 interface Message {
-  id: number;
+  id: string;
   type: "user" | "ai";
   content: string;
   timestamp: Date;
 }
 
 const Chat = () => {
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: 1,
-      type: "ai",
-      content: "Hello! I'm your AI Study Buddy. I can help explain concepts from your uploaded notes, answer questions, and break down complex topics into simple terms. What would you like to learn about today?",
-      timestamp: new Date()
-    }
-  ]);
-  
+  const [messages, setMessages] = useState<Message[]>([]);
   const [inputMessage, setInputMessage] = useState("");
   const [isTyping, setIsTyping] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [userNotes, setUserNotes] = useState<Note[]>([]);
+  const scrollAreaRef = useRef<HTMLDivElement>(null);
+  const { toast } = useToast();
+
+  useEffect(() => {
+    // Scroll to bottom when new message is added
+    if (scrollAreaRef.current) {
+      scrollAreaRef.current.scrollTop = scrollAreaRef.current.scrollHeight;
+    }
+  }, [messages]);
+
+  const loadChatData = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      // Load chat history
+      const chatResult = await ChatService.getChatHistory();
+      if (chatResult.success && chatResult.messages) {
+        const formattedMessages: Message[] = [];
+        
+        chatResult.messages.forEach((msg) => {
+          // Add user message
+          formattedMessages.push({
+            id: msg.id + "-user",
+            type: "user",
+            content: msg.message,
+            timestamp: new Date(msg.created_at)
+          });
+          
+          // Add AI response if exists
+          if (msg.response) {
+            formattedMessages.push({
+              id: msg.id + "-ai",
+              type: "ai",
+              content: msg.response,
+              timestamp: new Date(msg.created_at)
+            });
+          }
+        });
+        
+        setMessages(formattedMessages);
+      }
+
+      // Load user notes for context
+      const notesResult = await NotesService.getUserNotes();
+      if (notesResult.success && notesResult.notes) {
+        setUserNotes(notesResult.notes);
+      }
+
+      // Add welcome message if no chat history
+      if (!chatResult.success || !chatResult.messages || chatResult.messages.length === 0) {
+        const welcomeMessage: Message = {
+          id: "welcome",
+          type: "ai",
+          content: "Hello! I'm your AI Study Buddy. I can help explain concepts from your uploaded notes, answer questions, and break down complex topics into simple terms. What would you like to learn about today?",
+          timestamp: new Date()
+        };
+        setMessages([welcomeMessage]);
+      }
+    } catch (error) {
+      console.error('Chat data loading error:', error);
+      toast({
+        title: "Loading Error",
+        description: "Failed to load chat history. Starting fresh.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  }, [toast]);
+
+  useEffect(() => {
+    loadChatData();
+  }, [loadChatData]);
 
   const handleSendMessage = async () => {
     if (!inputMessage.trim()) return;
 
+    const userMessageId = Date.now().toString();
     const userMessage: Message = {
-      id: messages.length + 1,
+      id: userMessageId,
       type: "user",
       content: inputMessage,
       timestamp: new Date()
     };
 
     setMessages(prev => [...prev, userMessage]);
+    const currentMessage = inputMessage;
     setInputMessage("");
     setIsTyping(true);
 
-    // Simulate AI response - will be replaced with actual Hugging Face API call
-    setTimeout(() => {
+    try {
+      // Get context from user's notes - provide more comprehensive context
+      const context = userNotes.length > 0 
+        ? userNotes.map(note => {
+            // Extract more content for better context
+            const content = note.content.substring(0, 1000); // More content for better context
+            return `Document: ${note.title}\nContent: ${content}`;
+          }).join('\n\n')
+        : undefined;
+
+      // Generate AI response
+      const aiResult = await AIService.generateChatResponse(currentMessage, context);
+      
+      const aiMessageId = (Date.now() + 1).toString();
       const aiResponse: Message = {
-        id: messages.length + 2,
+        id: aiMessageId,
         type: "ai",
-        content: "I'd be happy to help explain that concept! However, to provide accurate answers based on your study material, you'll need to connect to Supabase first. This will enable me to access your uploaded notes and provide personalized explanations using the Hugging Face AI models.",
+        content: aiResult.success && aiResult.result
+          ? aiResult.result
+          : "I'm sorry, I'm having trouble processing your request right now. Please try again later.",
         timestamp: new Date()
       };
+
       setMessages(prev => [...prev, aiResponse]);
+
+      // Save to database
+      await ChatService.saveChatMessage({
+        message: currentMessage,
+        response: aiResponse.content,
+        isUser: true
+      });
+
+    } catch (error) {
+      console.error('Chat message error:', error);
+      const errorMessage: Message = {
+        id: Date.now().toString(),
+        type: "ai",
+        content: "I encountered an error while processing your message. Please try again.",
+        timestamp: new Date()
+      };
+      setMessages(prev => [...prev, errorMessage]);
+      
+      toast({
+        title: "Chat Error",
+        description: "Failed to process your message. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
       setIsTyping(false);
-    }, 1500);
+    }
+  };
+
+  const handleClearChat = async () => {
+    try {
+      const result = await ChatService.clearChatHistory();
+      if (result.success) {
+        setMessages([{
+          id: "welcome-new",
+          type: "ai",
+          content: "Chat history cleared! How can I help you with your studies today?",
+          timestamp: new Date()
+        }]);
+        toast({
+          title: "Chat Cleared",
+          description: "Chat history has been cleared successfully.",
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Clear Failed",
+        description: "Failed to clear chat history. Please try again.",
+        variant: "destructive",
+      });
+    }
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -60,12 +195,31 @@ const Chat = () => {
     }
   };
 
-  const suggestedQuestions = [
-    "Explain machine learning in simple terms",
-    "What are the key principles of database design?",
-    "How do React components work?",
-    "What's the difference between supervised and unsupervised learning?"
-  ];
+  const suggestedQuestions = userNotes.length > 0
+    ? [
+        `Explain the main concepts from "${userNotes[0]?.title || 'my notes'}"`,
+        "Summarize the key points from my study material",
+        "What are the most important topics I should focus on?",
+        "Can you quiz me on the uploaded content?",
+        "Break down complex concepts into simple terms"
+      ]
+    : [
+        "How does the AI study system work?",
+        "What file types can I upload?",
+        "How do flashcards help with learning?",
+        "What makes AI summaries effective?"
+      ];
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-background via-secondary/10 to-muted/20 flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
+          <p>Loading your chat...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-secondary/10 to-muted/20">
@@ -90,7 +244,7 @@ const Chat = () => {
                   <Button
                     key={index}
                     variant="ghost"
-                    className="w-full text-left text-sm h-auto py-3 px-3 justify-start"
+                    className="w-full text-left text-sm h-auto py-3 px-3 justify-start whitespace-normal"
                     onClick={() => setInputMessage(question)}
                   >
                     {question}
@@ -104,17 +258,27 @@ const Chat = () => {
           <div className="lg:col-span-3">
             <Card className="h-[700px] flex flex-col">
               <CardHeader className="flex-shrink-0">
-                <CardTitle className="flex items-center">
-                  <div className="w-8 h-8 gradient-primary rounded-full flex items-center justify-center mr-3">
-                    <Bot className="h-5 w-5 text-white" />
-                  </div>
-                  AI Study Assistant
-                </CardTitle>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="flex items-center">
+                    <div className="w-8 h-8 gradient-primary rounded-full flex items-center justify-center mr-3">
+                      <Bot className="h-5 w-5 text-white" />
+                    </div>
+                    AI Study Assistant
+                  </CardTitle>
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    onClick={handleClearChat}
+                    className="text-muted-foreground hover:text-foreground"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
               </CardHeader>
               
               <CardContent className="flex-1 flex flex-col p-0">
                 {/* Messages Area */}
-                <ScrollArea className="flex-1 px-6">
+                <ScrollArea className="flex-1 px-6" ref={scrollAreaRef}>
                   <div className="space-y-4 py-4">
                     {messages.map((message) => (
                       <div
@@ -188,7 +352,10 @@ const Chat = () => {
                     </Button>
                   </div>
                   <p className="text-xs text-muted-foreground mt-2">
-                    Connect to Supabase to enable AI-powered responses based on your study material
+                    {userNotes.length > 0 
+                      ? `AI responses based on your ${userNotes.length} uploaded note${userNotes.length === 1 ? '' : 's'}`
+                      : "Upload study materials to get personalized AI responses"
+                    }
                   </p>
                 </div>
               </CardContent>

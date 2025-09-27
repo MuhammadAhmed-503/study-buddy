@@ -1,21 +1,124 @@
 import { useState } from "react";
-import { Upload, FileText, Brain, Sparkles, BookOpen, MessageCircle } from "lucide-react";
+import { Upload, FileText, Brain, Sparkles, BookOpen, MessageCircle, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
+import { FileUploadService } from "@/services/FileUploadService";
+import { TextExtractionService } from "@/services/TextExtractionService";
+import { NotesService } from "@/services/NotesService";
+import { AIService } from "@/services/AIService";
+import { SummariesService } from "@/services/SummariesService";
+import { FlashcardsService } from "@/services/FlashcardsService";
+import { QuizzesService } from "@/services/QuizzesService";
 
 const Home = () => {
   const [isDragging, setIsDragging] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
   const { toast } = useToast();
+  const { user } = useAuth();
 
-  const handleFileUpload = (files: FileList | null) => {
-    if (!files || files.length === 0) return;
+  const handleFileUpload = async (files: FileList | null) => {
+    if (!files || files.length === 0 || !user) return;
     
-    // For now, just show a toast - actual upload will need Supabase backend
-    toast({
-      title: "Upload Ready",
-      description: "Connect to Supabase to enable file processing and AI features.",
-    });
+    setIsUploading(true);
+    
+    try {
+      for (const file of Array.from(files)) {
+        await processFile(file);
+      }
+    } catch (error) {
+      console.error('File upload error:', error);
+      toast({
+        title: "Upload Failed",
+        description: "An error occurred while uploading your files.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsUploading(false);
+      setUploadProgress(0);
+    }
+  };
+
+  const processFile = async (file: File) => {
+    try {
+      // Step 1: Extract text from file
+      setUploadProgress(25);
+      toast({
+        title: "Processing file",
+        description: `Extracting text from ${file.name}...`,
+      });
+
+      const extractionResult = await TextExtractionService.extractText(file);
+      if (!extractionResult.success) {
+        throw new Error(extractionResult.error);
+      }
+
+      // Step 2: Upload file to Supabase storage
+      setUploadProgress(50);
+      const uploadResult = await FileUploadService.uploadFile(file, user!.id);
+      if (!uploadResult.success) {
+        throw new Error(uploadResult.error);
+      }
+
+      // Step 3: Save note to database
+      setUploadProgress(60);
+      const title = file.name.replace(/\.[^/.]+$/, ""); // Remove file extension
+      const cleanText = TextExtractionService.cleanText(extractionResult.text || "");
+      
+      const noteResult = await NotesService.createNote({
+        title,
+        content: cleanText,
+        fileName: file.name,
+        fileType: file.type,
+        filePath: uploadResult.filePath,
+      });
+
+      if (!noteResult.success || !noteResult.note) {
+        throw new Error(noteResult.error);
+      }
+
+      // Step 4: Generate AI content
+      setUploadProgress(75);
+      toast({
+        title: "Generating AI content",
+        description: "Creating summary, flashcards, and quiz questions...",
+      });
+
+      // Generate summary
+      const summaryResult = await AIService.generateSummary(cleanText);
+      if (summaryResult.success && summaryResult.result) {
+        await SummariesService.createSummary(noteResult.note.id, summaryResult.result);
+      }
+
+      // Generate flashcards
+      const flashcardsResult = await AIService.generateFlashcards(cleanText, 5);
+      if (flashcardsResult.success && flashcardsResult.flashcards) {
+        await FlashcardsService.createFlashcards(noteResult.note.id, flashcardsResult.flashcards);
+      }
+
+      // Generate quiz questions
+      const quizResult = await AIService.generateQuiz(cleanText, 5);
+      if (quizResult.success && quizResult.questions) {
+        await QuizzesService.createQuiz(noteResult.note.id, quizResult.questions);
+      }
+
+      setUploadProgress(100);
+      toast({
+        title: "Upload Complete!",
+        description: `${file.name} has been processed with AI-generated content.`,
+      });
+
+    } catch (error) {
+      console.error('File processing error:', error);
+      toast({
+        title: "Processing Failed",
+        description: `Failed to process ${file.name}: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        variant: "destructive",
+      });
+    }
   };
 
   const handleDragOver = (e: React.DragEvent) => {
@@ -90,17 +193,35 @@ const Home = () => {
             >
               <CardContent className="p-12 text-center">
                 <div className="w-16 h-16 gradient-primary rounded-full flex items-center justify-center mx-auto mb-6 shadow-ai">
-                  <Upload className="h-8 w-8 text-white" />
+                  {isUploading ? (
+                    <Loader2 className="h-8 w-8 text-white animate-spin" />
+                  ) : (
+                    <Upload className="h-8 w-8 text-white" />
+                  )}
                 </div>
-                <h3 className="text-xl font-semibold mb-2">Upload Your Study Material</h3>
+                <h3 className="text-xl font-semibold mb-2">
+                  {isUploading ? "Processing Files..." : "Upload Your Study Material"}
+                </h3>
                 <p className="text-muted-foreground mb-6">
-                  Drag and drop your PDF, DOC, or TXT files here, or click to browse
+                  {isUploading 
+                    ? "Please wait while we extract text and save your files"
+                    : "Drag and drop your PDF, DOC, or TXT files here, or click to browse"
+                  }
                 </p>
+                
+                {isUploading && (
+                  <div className="mb-6">
+                    <Progress value={uploadProgress} className="w-full" />
+                    <p className="text-sm text-muted-foreground mt-2">{uploadProgress}% complete</p>
+                  </div>
+                )}
+                
                 <div className="flex flex-col sm:flex-row gap-4 justify-center">
                   <Button 
                     size="lg" 
                     className="gradient-primary text-white shadow-ai hover:shadow-lg transition-all"
                     onClick={() => document.getElementById('file-input')?.click()}
+                    disabled={isUploading}
                   >
                     <FileText className="h-5 w-5 mr-2" />
                     Choose Files
@@ -112,8 +233,9 @@ const Home = () => {
                     accept=".pdf,.doc,.docx,.txt"
                     className="hidden"
                     onChange={(e) => handleFileUpload(e.target.files)}
+                    disabled={isUploading}
                   />
-                  <Button variant="outline" size="lg">
+                  <Button variant="outline" size="lg" disabled={isUploading}>
                     Try Demo Files
                   </Button>
                 </div>

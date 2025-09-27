@@ -1,73 +1,200 @@
-# Welcome to your Lovable project
+# 🧠 AI Study Buddy
 
-## Project info
+An intelligent study companion that transforms your learning experience using AI-powered features. Upload documents, get instant summaries, generate flashcards, and chat with your study material.
 
-**URL**: https://lovable.dev/projects/a8c02da5-c1a4-4f12-a366-8bc90adf16dd
+## ✨ Features
 
-## How can I edit this code?
+### 📄 **Smart Document Processing**
+- Upload PDF, DOC, DOCX, and TXT files
+- Automatic text extraction from documents
+- Secure file storage with Supabase
 
-There are several ways of editing your application.
+### 🤖 **AI-Powered Learning Tools**
+- **Intelligent Summaries**: Get concise overviews of your study material
+- **Dynamic Flashcards**: Auto-generated Q&A pairs for active learning
+- **Study Chat**: Ask questions and get explanations based on your content
+- **Context-Aware Responses**: AI understands your uploaded material
 
-**Use Lovable**
+### 📊 **Learning Dashboard**
+- Track all your uploaded notes and materials
+- View AI-generated summaries and flashcards
+- Organize your study sessions
+- Monitor learning progress
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/a8c02da5-c1a4-4f12-a366-8bc90adf16dd) and start prompting.
+### 🔐 **Secure & Personal**
+- User authentication with Supabase Auth
+- Row-level security for all user data
+- Private file storage and processing
+- Persistent chat history
 
-Changes made via Lovable will be committed automatically to this repo.
+## 🚀 Tech Stack
 
-**Use your preferred IDE**
+### Frontend
+- **React 18** with TypeScript
+- **Vite** for fast development and building
+- **Tailwind CSS** + **shadcn/ui** for modern UI
+- **React Router** for navigation
+- **TanStack Query** for state management
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+### Backend & AI
+- **Supabase** for database, auth, and storage
+- **Hugging Face API** for AI model integration
+- **PDF.js** for PDF text extraction
+- **Mammoth.js** for Word document processing
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+### Development Tools
+- **TypeScript** for type safety
+- **ESLint** for code quality
+- **PostCSS** for CSS processing
+- **Bun** package manager
 
-Follow these steps:
+## 🛠️ Setup & Installation
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+### Prerequisites
+- Node.js 18+ or Bun runtime
+- Supabase account
+- Hugging Face API key (optional, fallback included)
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
-npm run dev
+### 1. Clone the Repository
+```bash
+git clone <repository-url>
+cd smart-study-buddy-18
 ```
 
-**Edit a file directly in GitHub**
+### 2. Install Dependencies
+```bash
+# Using npm
+npm install
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+# Or using bun
+bun install
+```
 
-**Use GitHub Codespaces**
+### 3. Environment Configuration
+Copy `.env.example` to `.env` and configure:
+```env
+VITE_SUPABASE_URL=your_supabase_url
+VITE_SUPABASE_PUBLISHABLE_KEY=your_supabase_anon_key
+VITE_HUGGINGFACE_API_KEY=your_huggingface_api_key
+```
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+### 4. Database Setup
+The Supabase database is pre-configured with:
+- User authentication
+- Notes storage with RLS
+- Chat message history
+- File storage buckets
+- AI-generated content tables
 
-## What technologies are used for this project?
+### 5. Start Development Server
+```bash
+npm run dev
+# or
+bun dev
+```
 
-This project is built with:
+Visit `http://localhost:8080` to see your application.
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+## 📁 Project Structure
 
-## How can I deploy this project?
+```
+src/
+├── components/          # Reusable UI components
+│   ├── ui/             # shadcn/ui components
+│   ├── AuthDialog.tsx  # Authentication forms
+│   ├── ErrorBoundary.tsx # Error handling
+│   └── Navigation.tsx  # Main navigation
+├── contexts/           # React contexts
+│   └── AuthContext.tsx # Authentication state
+├── hooks/              # Custom React hooks
+├── integrations/       # External service integrations
+│   └── supabase/      # Database client & types
+├── lib/               # Utility functions
+├── pages/             # Route components
+│   ├── Home.tsx       # Landing & file upload
+│   ├── Dashboard.tsx  # Notes management
+│   ├── Chat.tsx       # AI chat interface
+│   └── NotFound.tsx   # 404 error page
+└── services/          # Business logic & API calls
+    ├── AIService.ts          # AI model integration
+    ├── FileUploadService.ts  # File handling
+    ├── TextExtractionService.ts # Document processing
+    ├── NotesService.ts       # Notes CRUD operations
+    ├── ChatService.ts        # Chat functionality
+    ├── FlashcardsService.ts  # Flashcard management
+    └── SummariesService.ts   # Summary management
+```
 
-Simply open [Lovable](https://lovable.dev/projects/a8c02da5-c1a4-4f12-a366-8bc90adf16dd) and click on Share -> Publish.
+## 🎯 Key Features Explained
 
-## Can I connect a custom domain to my Lovable project?
+### Document Upload & Processing
+1. **Drag & Drop Interface**: Intuitive file upload with progress tracking
+2. **Text Extraction**: Automatic content extraction from various file formats
+3. **AI Processing**: Immediate summary and flashcard generation
+4. **Storage**: Secure file storage in Supabase with user isolation
 
-Yes, you can!
+### AI Integration
+- **Fallback System**: Works with or without Hugging Face API
+- **Context Awareness**: AI responses based on user's uploaded content
+- **Multiple Models**: Summary generation, chat responses, and content creation
+- **Smart Caching**: Efficient API usage and response caching
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+### User Experience
+- **Progressive Loading**: Smooth loading states throughout the app
+- **Error Boundaries**: Graceful error handling and recovery
+- **Responsive Design**: Works seamlessly on desktop and mobile
+- **Real-time Updates**: Live chat and dynamic content updates
 
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+## 🔧 Development Scripts
+
+```bash
+# Development server
+npm run dev
+
+# Production build
+npm run build
+
+# Preview production build
+npm run preview
+
+# Lint code
+npm run lint
+
+# Type checking
+npm run type-check
+```
+
+## 🚀 Deployment
+
+### Supabase Deployment
+The database is already configured and deployed on Supabase with all necessary tables and RLS policies.
+
+### Frontend Deployment
+Build and deploy to your preferred platform:
+```bash
+npm run build
+# Deploy the 'dist' folder to Vercel, Netlify, or any static host
+```
+
+## 🤝 Contributing
+
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
+
+## 📝 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## 🙏 Acknowledgments
+
+- **Supabase** for the backend infrastructure
+- **Hugging Face** for AI model access
+- **shadcn/ui** for the component library
+- **Lovable** for the initial project setup
+
+---
+
+**Start learning smarter with AI Study Buddy! 🎓✨**

@@ -27,7 +27,7 @@ export class QuizzesService {
         question: q.question,
         options: q.options,
         correct_answer: q.options[q.correct], // Convert index to actual answer
-        explanation: q.explanation,
+        // Note: explanation field is not stored in database, only used for UI
       }));
 
       const { data: quizzes, error } = await supabase
@@ -90,7 +90,7 @@ export class QuizzesService {
 
       const formattedQuizzes = quizzes?.map(quiz => ({
         ...quiz,
-        note_title: (quiz as any).notes.title
+        note_title: (quiz as Quiz & { notes: { title: string } }).notes.title
       })) || [];
 
       return { success: true, quizzes: formattedQuizzes };

@@ -53,7 +53,7 @@ export const AuthDialog = () => {
           <div className="w-16 h-16 gradient-primary rounded-full flex items-center justify-center mx-auto mb-4 shadow-ai">
             <User className="h-8 w-8 text-white" />
           </div>
-          <CardTitle className="text-2xl">Welcome to AI Study Buddy</CardTitle>
+          <CardTitle className="text-2xl">Welcome to Study Buddy</CardTitle>
           <CardDescription>
             Sign in to access your personalized study materials and AI features
           </CardDescription>

@@ -7,15 +7,16 @@ Update your `.env` file with your actual API keys:
 ```env
 VITE_SUPABASE_URL=https://bhmqgdikfehhmazjdhar.supabase.co
 VITE_SUPABASE_PUBLISHABLE_KEY=your_actual_supabase_key
-VITE_HUGGINGFACE_API_KEY=your_huggingface_api_key
+VITE_GROK_API_KEY=your_grok_api_key
 ```
 
 ### 2. **Supabase Database**
 The database is already configured with all necessary tables and policies. No additional setup needed.
 
-### 3. **Hugging Face API (Optional)**
-- Get a free API key from [Hugging Face](https://huggingface.co/settings/tokens)
+### 3. **Grok AI API (Optional)**
+- Get an API key from [xAI Console](https://console.x.ai/)
 - The app works without it using fallback local AI processing
+- Grok provides superior quality for summaries, flashcards, quizzes, and chat
 
 ### 4. **Test the Application**
 ```bash

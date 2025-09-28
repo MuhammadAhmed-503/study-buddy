@@ -53,4 +53,48 @@ export class SummariesService {
       };
     }
   }
+
+  static async deleteSummary(summaryId: string): Promise<{ success: boolean; error?: string }> {
+    try {
+      const { error } = await supabase
+        .from('summaries')
+        .delete()
+        .eq('id', summaryId);
+
+      if (error) {
+        console.error('Delete summary error:', error);
+        return { success: false, error: error.message };
+      }
+
+      return { success: true };
+    } catch (error) {
+      console.error('Summaries service error:', error);
+      return { 
+        success: false, 
+        error: error instanceof Error ? error.message : 'Unknown error' 
+      };
+    }
+  }
+
+  static async deleteSummariesByNoteId(noteId: string): Promise<{ success: boolean; error?: string }> {
+    try {
+      const { error } = await supabase
+        .from('summaries')
+        .delete()
+        .eq('note_id', noteId);
+
+      if (error) {
+        console.error('Delete summaries by note error:', error);
+        return { success: false, error: error.message };
+      }
+
+      return { success: true };
+    } catch (error) {
+      console.error('Summaries service error:', error);
+      return { 
+        success: false, 
+        error: error instanceof Error ? error.message : 'Unknown error' 
+      };
+    }
+  }
 }

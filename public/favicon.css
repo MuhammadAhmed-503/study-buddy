@@ -1,0 +1,12 @@
+/* Stylesheet for favicon */
+:root {
+  --favicon-color: #4F46E5; /* Default color - matches your primary indigo theme */
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --favicon-color: #818CF8; /* Lighter color for dark mode */
+  }
+}
+
+/* This will be used by the SVG favicon */

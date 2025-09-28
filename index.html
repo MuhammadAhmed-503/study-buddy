@@ -3,9 +3,14 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>AI Study Buddy - Your AI-Powered Study Companion</title>
+    <title>Study Buddy - Your AI-Powered Study Companion</title>
     <meta name="description" content="Upload your notes and let AI create summaries, flashcards, and quizzes. Chat with your study material to understand complex topics effortlessly." />
     <meta name="author" content="AI Study Buddy" />
+    
+    <link rel="icon" href="favicon.svg" type="image/svg+xml" />
+    <link rel="icon" href="favicon.ico" type="image/x-icon" />
+    <link rel="shortcut icon" href="favicon.ico" />
+    <link rel="apple-touch-icon" href="favicon.svg" />
 
     <meta property="og:title" content="AI Study Buddy - Your AI-Powered Study Companion" />
     <meta property="og:description" content="Upload your notes and let AI create summaries, flashcards, and quizzes. Chat with your study material to understand complex topics effortlessly." />
@@ -15,6 +20,39 @@
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:site" content="@lovable_dev" />
     <meta name="twitter:image" content="https://lovable.dev/opengraph-image-p98pqg.png" />
+    <!-- Fallback script to ensure favicon works in all browsers -->
+    <script>
+      // Create a fallback favicon if the SVG one fails to load
+      (function() {
+        try {
+          const checkFavicon = () => {
+            const links = document.querySelectorAll('link[rel*="icon"]');
+            let faviconExists = false;
+            
+            for (const link of links) {
+              const img = new Image();
+              img.src = link.href;
+              img.onload = function() { faviconExists = true; };
+              img.onerror = function() {
+                if (!faviconExists) {
+                  // Fallback to dynamically creating a favicon
+                  const link = document.createElement('link');
+                  link.type = 'image/svg+xml';
+                  link.rel = 'icon';
+                  link.href = 'icon.svg';
+                  document.head.appendChild(link);
+                }
+              };
+            }
+          };
+          
+          // Check after page is fully loaded
+          window.addEventListener('load', checkFavicon);
+        } catch (e) { 
+          console.error('Favicon script error:', e);
+        }
+      })();
+    </script>
   </head>
 
   <body>

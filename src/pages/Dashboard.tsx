@@ -1,19 +1,22 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { FileText, Brain, BookOpen, Star, Download, Trash2, Loader2, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
+import { useNavigate } from "react-router-dom";
 import { NotesService, Note } from "@/services/NotesService";
 import { FlashcardsService, Flashcard } from "@/services/FlashcardsService";
 import { SummariesService, Summary } from "@/services/SummariesService";
-import { QuizzesService } from "@/services/QuizzesService";
+import { QuizzesService, Quiz, QuizResult } from "@/services/QuizzesService";
 import { FileUploadService } from "@/services/FileUploadService";
 import { TextExtractionService } from "@/services/TextExtractionService";
 
 interface NoteWithCounts extends Note {
   summaryText?: string;
+  summaryId?: string;
   flashcardCount: number;
   quizCount: number;
 }
@@ -21,27 +24,26 @@ interface NoteWithCounts extends Note {
 const Dashboard = () => {
   const [notes, setNotes] = useState<NoteWithCounts[]>([]);
   const [flashcards, setFlashcards] = useState<(Flashcard & { note_title: string })[]>([]);
-  const [quizzes, setQuizzes] = useState<any[]>([]);
+  const [quizzes, setQuizzes] = useState<(Quiz & { note_title: string })[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
+  const navigate = useNavigate();
 
   // Quiz state
-  const [currentQuiz, setCurrentQuiz] = useState<any[]>([]);
+  const [currentQuiz, setCurrentQuiz] = useState<Quiz[]>([]);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [selectedAnswers, setSelectedAnswers] = useState<Record<string, string>>({});
   const [quizCompleted, setQuizCompleted] = useState(false);
-  const [quizResults, setQuizResults] = useState<any>(null);
+  const [quizResults, setQuizResults] = useState<QuizResult | null>(null);
   const [quizStartTime, setQuizStartTime] = useState<number>(0);
 
   const [currentFlashcard, setCurrentFlashcard] = useState(0);
   const [showAnswer, setShowAnswer] = useState(false);
   const [selectedDocument, setSelectedDocument] = useState<string>('all');
+  const [isSummaryModalOpen, setIsSummaryModalOpen] = useState<boolean>(false);
+  const [selectedNote, setSelectedNote] = useState<NoteWithCounts | null>(null);
 
-  useEffect(() => {
-    loadDashboardData();
-  }, []);
-
-  const loadDashboardData = async () => {
+  const loadDashboardData = useCallback(async () => {
     setIsLoading(true);
     try {
       // Load notes
@@ -53,6 +55,9 @@ const Dashboard = () => {
             const summariesResult = await SummariesService.getSummariesByNoteId(note.id);
             const summaryText = summariesResult.success && summariesResult.summaries && summariesResult.summaries.length > 0
               ? summariesResult.summaries[0].summary_text
+              : undefined;
+            const summaryId = summariesResult.success && summariesResult.summaries && summariesResult.summaries.length > 0
+              ? summariesResult.summaries[0].id
               : undefined;
 
             // Get flashcards count
@@ -70,6 +75,7 @@ const Dashboard = () => {
             return {
               ...note,
               summaryText,
+              summaryId,
               flashcardCount,
               quizCount
             };
@@ -99,7 +105,11 @@ const Dashboard = () => {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [toast]);
+
+  useEffect(() => {
+    loadDashboardData();
+  }, [loadDashboardData]);
 
   const handleDeleteNote = async (noteId: string) => {
     try {
@@ -117,6 +127,31 @@ const Dashboard = () => {
       toast({
         title: "Delete Failed",
         description: "Failed to delete the note. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleDeleteSummary = async (noteId: string, summaryId: string) => {
+    try {
+      const result = await SummariesService.deleteSummary(summaryId);
+      if (result.success) {
+        setNotes(prev => prev.map(note => 
+          note.id === noteId 
+            ? { ...note, summaryText: undefined, summaryId: undefined }
+            : note
+        ));
+        toast({
+          title: "Summary Deleted",
+          description: "Summary has been successfully deleted.",
+        });
+      } else {
+        throw new Error(result.error);
+      }
+    } catch (error) {
+      toast({
+        title: "Delete Failed",
+        description: "Failed to delete the summary. Please try again.",
         variant: "destructive",
       });
     }
@@ -152,7 +187,9 @@ const Dashboard = () => {
   const startQuiz = (noteId: string) => {
     const noteQuizzes = quizzes.filter(q => q.note_id === noteId);
     if (noteQuizzes.length > 0) {
-      setCurrentQuiz(noteQuizzes);
+      // Convert the quizzes to match the Quiz type without note_title
+      const quizList: Quiz[] = noteQuizzes.map(({ note_title, ...quiz }) => quiz);
+      setCurrentQuiz(quizList);
       setCurrentQuestionIndex(0);
       setSelectedAnswers({});
       setQuizCompleted(false);
@@ -208,8 +245,62 @@ const Dashboard = () => {
     );
   }
 
+  // Handler functions for buttons
+  const handleViewSummary = (note: NoteWithCounts) => {
+    setSelectedNote(note);
+    setIsSummaryModalOpen(true);
+  };
+
+  const handleStudyFlashcards = (note: NoteWithCounts) => {
+    // Switch to flashcards tab and filter by document
+    const tabsList = document.querySelector('[data-state="list"]');
+    const flashcardsTab = tabsList?.querySelector('[value="flashcards"]') as HTMLElement;
+    if (flashcardsTab) {
+      flashcardsTab.click();
+    }
+    setSelectedDocument(note.title);
+    setCurrentFlashcard(0);
+    setShowAnswer(false);
+  };
+
+  const handleTakeQuiz = (note: NoteWithCounts) => {
+    // Switch to quizzes tab and start quiz with this note's id
+    const tabsList = document.querySelector('[data-state="list"]');
+    const quizzesTab = tabsList?.querySelector('[value="quizzes"]') as HTMLElement;
+    if (quizzesTab) {
+      quizzesTab.click();
+    }
+    startQuiz(note.id);
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-secondary/10 to-muted/20">
+      {/* Summary Modal */}
+      <Dialog open={isSummaryModalOpen} onOpenChange={setIsSummaryModalOpen}>
+        <DialogContent className="sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="text-xl">{selectedNote?.title} - Summary</DialogTitle>
+            <DialogDescription>
+              AI-generated summary of your document
+            </DialogDescription>
+          </DialogHeader>
+          <div className="max-h-[60vh] overflow-y-auto my-6 p-4 bg-muted/20 rounded-lg border border-muted">
+            {selectedNote?.summaryText ? (
+              <p className="text-sm leading-relaxed whitespace-pre-wrap">
+                {selectedNote.summaryText}
+              </p>
+            ) : (
+              <p className="text-center text-muted-foreground py-8">No summary available for this document.</p>
+            )}
+          </div>
+          <DialogFooter>
+            <DialogClose asChild>
+              <Button variant="secondary">Close</Button>
+            </DialogClose>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="mb-8">
           <h1 className="text-3xl font-bold mb-2">Study Dashboard</h1>
@@ -233,7 +324,10 @@ const Dashboard = () => {
                 <p className="text-muted-foreground mb-6">
                   Upload your first study material to get started with AI-powered learning.
                 </p>
-                <Button className="gradient-primary text-white">
+                <Button 
+                  className="gradient-primary text-white"
+                  onClick={() => navigate('/')}
+                >
                   <Plus className="h-4 w-4 mr-2" />
                   Upload Notes
                 </Button>
@@ -278,11 +372,23 @@ const Dashboard = () => {
                       <div className="space-y-4">
                         {note.summaryText && (
                           <div>
-                            <h4 className="font-medium mb-2 flex items-center">
-                              <Brain className="h-4 w-4 mr-2 text-primary" />
-                              AI Summary
-                            </h4>
-                            <p className="text-sm text-muted-foreground">{note.summaryText}</p>
+                            <div className="flex items-center justify-between mb-2">
+                              <h4 className="font-medium flex items-center">
+                                <Brain className="h-4 w-4 mr-2 text-primary" />
+                                AI Summary
+                              </h4>
+                              {note.summaryId && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleDeleteSummary(note.id, note.summaryId!)}
+                                  className="text-destructive hover:text-destructive"
+                                >
+                                  <Trash2 className="h-3 w-3" />
+                                </Button>
+                              )}
+                            </div>
+                            <p className="text-sm text-muted-foreground">{note.summaryText.length > 200 ? note.summaryText.substring(0, 200) + '...' : note.summaryText}</p>
                           </div>
                         )}
                         <div className="flex items-center space-x-6 text-sm">
@@ -295,19 +401,19 @@ const Dashboard = () => {
                             <span>{note.quizCount} Quiz Questions</span>
                           </div>
                         </div>
-                        <div className="flex space-x-2">
+                        <div className="flex flex-wrap gap-2">
                           {note.summaryText && (
-                            <Button size="sm" variant="outline">
+                            <Button size="sm" variant="outline" onClick={() => handleViewSummary(note)}>
                               View Full Summary
                             </Button>
                           )}
                           {note.flashcardCount > 0 && (
-                            <Button size="sm" variant="outline">
-                              Study Flashcards
+                            <Button size="sm" variant="outline" onClick={() => handleStudyFlashcards(note)}>
+                              Study Flashcards ({note.flashcardCount})
                             </Button>
                           )}
                           {note.quizCount > 0 ? (
-                            <Button size="sm" variant="outline">
+                            <Button size="sm" variant="outline" onClick={() => handleTakeQuiz(note)}>
                               Take Quiz ({note.quizCount} questions)
                             </Button>
                           ) : (
@@ -334,7 +440,10 @@ const Dashboard = () => {
                 <p className="text-muted-foreground mb-6">
                   Upload study materials to automatically generate flashcards with AI.
                 </p>
-                <Button className="gradient-primary text-white">
+                <Button 
+                  className="gradient-primary text-white"
+                  onClick={() => navigate('/')}
+                >
                   <Plus className="h-4 w-4 mr-2" />
                   Upload Notes
                 </Button>
@@ -455,7 +564,10 @@ const Dashboard = () => {
                     <p className="text-muted-foreground mb-6">
                       Upload study materials to automatically generate quiz questions with AI.
                     </p>
-                    <Button className="gradient-primary text-white">
+                    <Button 
+                      className="gradient-primary text-white"
+                      onClick={() => navigate('/')}
+                    >
                       <Plus className="h-4 w-4 mr-2" />
                       Upload Notes
                     </Button>
@@ -518,7 +630,7 @@ const Dashboard = () => {
                         </h3>
 
                         <div className="space-y-3">
-                          {currentQuiz[currentQuestionIndex]?.options?.map((option: string, index: number) => (
+                          {Array.isArray(currentQuiz[currentQuestionIndex]?.options) && (currentQuiz[currentQuestionIndex].options as string[]).map((option: string, index: number) => (
                             <div
                               key={index}
                               className={`p-4 border rounded-lg cursor-pointer transition-all hover:border-primary ${

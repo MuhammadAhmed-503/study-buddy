@@ -80,11 +80,18 @@ const Home = () => {
         throw new Error(noteResult.error);
       }
 
+      // Calculate optimal count based on document length
+      const wordCount = cleanText.split(/\s+/).length;
+      const flashcardCount = Math.max(5, Math.min(20, Math.floor(wordCount / 100))); // 1 flashcard per 100 words, min 5, max 20
+      const quizCount = Math.max(3, Math.min(15, Math.floor(wordCount / 150))); // 1 quiz question per 150 words, min 3, max 15
+      
+      console.log(`Document processing: ${wordCount} words, generating ${flashcardCount} flashcards and ${quizCount} quiz questions`);
+
       // Step 4: Generate AI content
       setUploadProgress(75);
       toast({
         title: "Generating AI content",
-        description: "Creating summary, flashcards, and quiz questions...",
+        description: `Creating summary, ${flashcardCount} flashcards, and ${quizCount} quiz questions...`,
       });
 
       // Generate summary
@@ -94,21 +101,35 @@ const Home = () => {
       }
 
       // Generate flashcards
-      const flashcardsResult = await AIService.generateFlashcards(cleanText, 5);
+      const flashcardsResult = await AIService.generateFlashcards(cleanText, flashcardCount);
       if (flashcardsResult.success && flashcardsResult.flashcards) {
-        await FlashcardsService.createFlashcards(noteResult.note.id, flashcardsResult.flashcards);
+        const createFlashcardsResult = await FlashcardsService.createFlashcards(noteResult.note.id, flashcardsResult.flashcards);
+        if (!createFlashcardsResult.success) {
+          console.error('Failed to create flashcards:', createFlashcardsResult.error);
+        } else {
+          console.log(`Successfully created ${flashcardsResult.flashcards.length} flashcards`);
+        }
+      } else {
+        console.error('Failed to generate flashcards:', flashcardsResult.error);
       }
 
       // Generate quiz questions
-      const quizResult = await AIService.generateQuiz(cleanText, 5);
+      const quizResult = await AIService.generateQuiz(cleanText, quizCount);
       if (quizResult.success && quizResult.questions) {
-        await QuizzesService.createQuiz(noteResult.note.id, quizResult.questions);
+        const createQuizResult = await QuizzesService.createQuiz(noteResult.note.id, quizResult.questions);
+        if (!createQuizResult.success) {
+          console.error('Failed to create quiz:', createQuizResult.error);
+        } else {
+          console.log(`Successfully created ${quizResult.questions.length} quiz questions`);
+        }
+      } else {
+        console.error('Failed to generate quiz questions:', quizResult.error);
       }
 
       setUploadProgress(100);
       toast({
         title: "Upload Complete!",
-        description: `${file.name} has been processed with AI-generated content.`,
+        description: `${file.name} processed with ${flashcardCount} flashcards and ${quizCount} quiz questions.`,
       });
 
     } catch (error) {
@@ -168,15 +189,15 @@ const Home = () => {
     <div className="min-h-screen bg-gradient-to-br from-background via-secondary/20 to-accent/10">
       {/* Hero Section */}
       <div className="relative overflow-hidden">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-20 pb-16">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-20 pb-20">
           <div className="text-center">
-            <h1 className="text-4xl md:text-6xl font-bold bg-gradient-to-r from-primary via-accent to-success bg-clip-text text-transparent mb-6">
+            <h1 className="text-4xl md:text-6xl font-bold bg-gradient-to-r from-primary via-accent to-success bg-clip-text text-transparent mb-10">
               Your AI-Powered
               <br />
               Study Companion
             </h1>
             <p className="text-xl text-muted-foreground max-w-3xl mx-auto mb-12">
-              Upload your notes and let AI create summaries, flashcards, and quizzes. 
+              Upload your notes and let AI create summaries, flashcards and quizzes. 
               Chat with your study material to understand complex topics effortlessly.
             </p>
 

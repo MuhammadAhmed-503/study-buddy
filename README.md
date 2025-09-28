@@ -75,7 +75,7 @@ Copy `.env.example` to `.env` and configure:
 ```env
 VITE_SUPABASE_URL=your_supabase_url
 VITE_SUPABASE_PUBLISHABLE_KEY=your_supabase_anon_key
-VITE_HUGGINGFACE_API_KEY=your_huggingface_api_key
+VITE_GROK_API_KEY=your_grok_api_key
 ```
 
 ### 4. Database Setup
@@ -134,10 +134,10 @@ src/
 4. **Storage**: Secure file storage in Supabase with user isolation
 
 ### AI Integration
-- **Fallback System**: Works with or without Hugging Face API
+- **Grok AI**: Powered by xAI's Grok model for high-quality responses
 - **Context Awareness**: AI responses based on user's uploaded content
-- **Multiple Models**: Summary generation, chat responses, and content creation
-- **Smart Caching**: Efficient API usage and response caching
+- **Multiple Features**: Summary generation, chat responses, flashcards, and quizzes
+- **Smart Fallback**: Local generation when API is unavailable
 
 ### User Experience
 - **Progressive Loading**: Smooth loading states throughout the app

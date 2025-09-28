@@ -38,7 +38,9 @@ const Chat = () => {
     try {
       // Load chat history
       const chatResult = await ChatService.getChatHistory();
-      if (chatResult.success && chatResult.messages) {
+      console.log('Chat history result:', chatResult);
+      
+      if (chatResult.success && chatResult.messages && chatResult.messages.length > 0) {
         const formattedMessages: Message[] = [];
         
         chatResult.messages.forEach((msg) => {
@@ -61,7 +63,18 @@ const Chat = () => {
           }
         });
         
+        console.log('Setting formatted messages:', formattedMessages.length);
         setMessages(formattedMessages);
+      } else {
+        // No chat history found or error occurred - show welcome message
+        console.log('No chat history found, showing welcome message');
+        const welcomeMessage: Message = {
+          id: "welcome",
+          type: "ai",
+          content: "Hello! I'm your AI assistant. I can help you with any questions, provide explanations on various topics, assist with problem-solving, engage in conversations, and much more. What can I help you with today?",
+          timestamp: new Date()
+        };
+        setMessages([welcomeMessage]);
       }
 
       // Load user notes for context
@@ -70,18 +83,18 @@ const Chat = () => {
         setUserNotes(notesResult.notes);
       }
 
-      // Add welcome message if no chat history
-      if (!chatResult.success || !chatResult.messages || chatResult.messages.length === 0) {
-        const welcomeMessage: Message = {
-          id: "welcome",
-          type: "ai",
-          content: "Hello! I'm your AI Study Buddy. I can help explain concepts from your uploaded notes, answer questions, and break down complex topics into simple terms. What would you like to learn about today?",
-          timestamp: new Date()
-        };
-        setMessages([welcomeMessage]);
-      }
     } catch (error) {
       console.error('Chat data loading error:', error);
+      
+      // Show welcome message on error
+      const welcomeMessage: Message = {
+        id: "welcome-error",
+        type: "ai",
+        content: "Hello! I'm your AI assistant. I can help you with any questions, provide explanations on various topics, assist with problem-solving, engage in conversations, and much more. What can I help you with today?",
+        timestamp: new Date()
+      };
+      setMessages([welcomeMessage]);
+      
       toast({
         title: "Loading Error",
         description: "Failed to load chat history. Starting fresh.",
@@ -113,17 +126,8 @@ const Chat = () => {
     setIsTyping(true);
 
     try {
-      // Get context from user's notes - provide more comprehensive context
-      const context = userNotes.length > 0 
-        ? userNotes.map(note => {
-            // Extract more content for better context
-            const content = note.content.substring(0, 1000); // More content for better context
-            return `Document: ${note.title}\nContent: ${content}`;
-          }).join('\n\n')
-        : undefined;
-
-      // Generate AI response
-      const aiResult = await AIService.generateChatResponse(currentMessage, context);
+      // Generate AI response without document context (universal chatbot)
+      const aiResult = await AIService.generateChatResponse(currentMessage);
       
       const aiMessageId = (Date.now() + 1).toString();
       const aiResponse: Message = {
@@ -166,24 +170,64 @@ const Chat = () => {
 
   const handleClearChat = async () => {
     try {
+      console.log('Attempting to clear chat history...');
       const result = await ChatService.clearChatHistory();
+      
       if (result.success) {
+        // Reset messages to welcome state
         setMessages([{
           id: "welcome-new",
           type: "ai",
           content: "Chat history cleared! How can I help you with your studies today?",
           timestamp: new Date()
         }]);
+        
         toast({
           title: "Chat Cleared",
           description: "Chat history has been cleared successfully.",
         });
+        
+        console.log('Chat history cleared successfully');
+      } else {
+        console.error('Failed to clear chat history:', result.error);
+        
+        // Always clear local state, but show appropriate message
+        setMessages([{
+          id: "welcome-cleared",
+          type: "ai",
+          content: "Chat history cleared! How can I help you with your studies today?",
+          timestamp: new Date()
+        }]);
+        
+        if (result.error?.includes('permission') || result.error?.includes('policy') || result.error?.includes('Database permissions')) {
+          toast({
+            title: "Cleared Locally",
+            description: "Chat cleared for this session. Database permissions may cause messages to reappear.",
+            variant: "default",
+          });
+        } else {
+          toast({
+            title: "Cleared with Warning", 
+            description: `Chat cleared locally. Database error: ${result.error}`,
+            variant: "default",
+          });
+        }
       }
     } catch (error) {
+      console.error('Clear chat error:', error);
+      
+      // Still clear local state even on error
+      setMessages([{
+        id: "welcome-error-cleared",
+        type: "ai", 
+        content: "Chat history cleared! How can I help you with your studies today?",
+        timestamp: new Date()
+      }]);
+      
       toast({
-        title: "Clear Failed",
-        description: "Failed to clear chat history. Please try again.",
-        variant: "destructive",
+        title: "Cleared Locally",
+        description: "Chat cleared for this session only due to an error.",
+        variant: "default",
       });
     }
   };
@@ -195,20 +239,16 @@ const Chat = () => {
     }
   };
 
-  const suggestedQuestions = userNotes.length > 0
-    ? [
-        `Explain the main concepts from "${userNotes[0]?.title || 'my notes'}"`,
-        "Summarize the key points from my study material",
-        "What are the most important topics I should focus on?",
-        "Can you quiz me on the uploaded content?",
-        "Break down complex concepts into simple terms"
-      ]
-    : [
-        "How does the AI study system work?",
-        "What file types can I upload?",
-        "How do flashcards help with learning?",
-        "What makes AI summaries effective?"
-      ];
+  const suggestedQuestions = [
+    "Explain quantum physics in simple terms",
+    "Help me write a professional email",
+    "What's the latest in AI technology?",
+    "Solve this math problem for me",
+    "Tell me a fun fact about space",
+    "How do I improve my productivity?",
+    "Explain blockchain technology",
+    "What are the benefits of meditation?"
+  ];
 
   if (isLoading) {
     return (
@@ -225,8 +265,8 @@ const Chat = () => {
     <div className="min-h-screen bg-gradient-to-br from-background via-secondary/10 to-muted/20">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="mb-8">
-          <h1 className="text-3xl font-bold mb-2">Study Chat</h1>
-          <p className="text-muted-foreground">Ask questions about your study material and get AI-powered explanations</p>
+          <h1 className="text-3xl font-bold mb-2">AI Chat</h1>
+          <p className="text-muted-foreground">Chat with AI about anything - ask questions, get explanations, or have a conversation</p>
         </div>
 
         <div className="grid lg:grid-cols-4 gap-6">
@@ -236,7 +276,7 @@ const Chat = () => {
               <CardHeader>
                 <CardTitle className="text-lg flex items-center">
                   <BookOpen className="h-5 w-5 mr-2 text-primary" />
-                  Quick Questions
+                  Suggested Topics
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-2">
@@ -263,7 +303,7 @@ const Chat = () => {
                     <div className="w-8 h-8 gradient-primary rounded-full flex items-center justify-center mr-3">
                       <Bot className="h-5 w-5 text-white" />
                     </div>
-                    AI Study Assistant
+                    AI Assistant
                   </CardTitle>
                   <Button 
                     variant="ghost" 
@@ -337,7 +377,7 @@ const Chat = () => {
                 <div className="border-t border-card-border p-4">
                   <div className="flex space-x-2">
                     <Input
-                      placeholder="Ask a question about your study material..."
+                      placeholder="Ask me anything or start a conversation..."
                       value={inputMessage}
                       onChange={(e) => setInputMessage(e.target.value)}
                       onKeyPress={handleKeyPress}
@@ -352,10 +392,7 @@ const Chat = () => {
                     </Button>
                   </div>
                   <p className="text-xs text-muted-foreground mt-2">
-                    {userNotes.length > 0 
-                      ? `AI responses based on your ${userNotes.length} uploaded note${userNotes.length === 1 ? '' : 's'}`
-                      : "Upload study materials to get personalized AI responses"
-                    }
+                    Powered by advanced AI - ask about any topic, get help with tasks, or have a conversation
                   </p>
                 </div>
               </CardContent>
